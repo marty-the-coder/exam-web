@@ -1,1 +1,50 @@
 Random cities:
+Oslo
+Stockholm
+Kopenhagen
+Brussel
+Dortmund
+Madrid
+Barcelona
+Rome
+Turin
+Beijing
+Shanghai
+Bangkok
+Tokyo
+New York
+Berlin
+Cape Town
+Kairo
+Nairobi
+Lagos
+Phoenix
+Miami
+Houston
+Cancun
+Winnipeg
+Ottawa
+Yellowknife
+Buenos Aires
+Rio de Janeiro
+Sao Paulo
+Botoga
+Alexandria
+Alger
+Tunis
+Mogadishu
+Freetown
+Marrakech
+Paris
+London
+Lisboa
+Budapest
+Praha
+Valencia
+Kyiv
+Moskva
+Tromsø
+Stavanger
+Gjøvik
+Hamar
+Ålesund
