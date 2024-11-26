@@ -1,9 +1,6 @@
 #!/bin/bash
 
-# OpenWeatherMap API Key (replace with your API key)
-API_KEY="your_openweathermap_api_key"
-
-# Function to fetch cities from the public link
+# Function to fetch cities from the provided URL
 fetch_cities() {
   curl -s "https://nicolbus.folk.ntnu.no/cities"
 }
@@ -12,58 +9,89 @@ fetch_cities() {
 get_temperature_by_coords() {
   local lat="$1"
   local lon="$2"
-  # Fetch the weather data
-  local response=$(curl -s "http://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${API_KEY}&units=metric")
-  echo "API Response: $response" # Debug line to log the full API response
-
-  # Extract the temperature
-  local temp=$(echo "$response" | jq '.main.temp')
+  
+  # Fetch weather data using Open-Meteo API
+  local response=$(curl -s "https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true")
+  
+  # Extract temperature from the JSON response
+  local temp=$(echo "$response" | jq '.current_weather.temperature')
   echo "$temp"
 }
 
-# Fetch the list of cities
+# Ensure jq is installed
+if ! command -v jq &> /dev/null; then
+    echo "Error: jq is not installed. Please install jq to run this script."
+    exit 1
+fi
+
+# Fetch and parse city data
 CITY_DATA=$(fetch_cities)
 if [[ -z "$CITY_DATA" ]]; then
-  echo "Failed to fetch cities from the link. Exiting."
+  echo "Failed to fetch city data. Exiting."
   exit 1
 fi
 
-# Parse the city data into an array
+# Convert city data into an array
 IFS=$'\n' read -r -d '' -a CITIES <<< "$CITY_DATA"
+
+# Verify city list is not empty
+if [[ ${#CITIES[@]} -eq 0 ]]; then
+    echo "No cities found in the list. Exiting."
+    exit 1
+fi
 
 # Game loop
 while true; do
-  # Pick a random city
-  RANDOM_CITY_INFO=${CITIES[$RANDOM % ${#CITIES[@]}]}
+  # Randomly select a city
+  RANDOM_CITY_INFO=$(printf "%s\n" "${CITIES[@]}" | shuf -n 1)
   CITY_NAME=$(echo "$RANDOM_CITY_INFO" | cut -d',' -f1)
   LATITUDE=$(echo "$RANDOM_CITY_INFO" | cut -d',' -f2)
   LONGITUDE=$(echo "$RANDOM_CITY_INFO" | cut -d',' -f3)
 
-  echo "Guess the current temperature in ${CITY_NAME}:"
+  # Ensure the selected city data is valid
+  if [[ -z "$CITY_NAME" || -z "$LATITUDE" || -z "$LONGITUDE" ]]; then
+      echo "Malformed city data. Skipping."
+      continue
+  fi
+
+  # Ask the user to guess the temperature
+  echo "Guess the current temperature in ${CITY_NAME} (type 'quit' to exit):"
   read -r USER_GUESS
 
-  # Fetch actual temperature
+  # Allow the user to exit
+  if [[ "$USER_GUESS" == "quit" ]]; then
+      echo "Goodbye! Thanks for playing."
+      break
+  fi
+
+  # Validate the user's guess
+  if ! [[ "$USER_GUESS" =~ ^-?[0-9]+(\.[0-9]+)?$ ]]; then
+      echo "Please enter a valid number for the temperature."
+      continue
+  fi
+
+  # Fetch the actual temperature
   ACTUAL_TEMP=$(get_temperature_by_coords "$LATITUDE" "$LONGITUDE")
 
   # Handle API errors
   if [[ "$ACTUAL_TEMP" == "null" ]]; then
-    echo "Failed to get the temperature for ${CITY_NAME}. Please try again."
-    continue
+      echo "Failed to fetch the temperature for ${CITY_NAME}. Please try again."
+      continue
   fi
 
-  # Compare guess with actual temperature
+  # Compare the guessed and actual temperatures
   DIFF=$(echo "$ACTUAL_TEMP - $USER_GUESS" | bc | tr -d -)
   if (( $(echo "$DIFF < 5" | bc -l) )); then
-    echo "Congratulations! The actual temperature in ${CITY_NAME} is ${ACTUAL_TEMP}°C. You were close!"
+      echo "Congratulations! The actual temperature in ${CITY_NAME} is ${ACTUAL_TEMP}°C. You were close!"
   else
-    echo "Sorry, the actual temperature in ${CITY_NAME} is ${ACTUAL_TEMP}°C. Better luck next time!"
+      echo "Sorry, the actual temperature in ${CITY_NAME} is ${ACTUAL_TEMP}°C. Better luck next time!"
   fi
 
-  # Ask if the user wants to play again
+  # Ask the user if they want to play again
   echo "Do you want to play again? (yes/no)"
   read -r PLAY_AGAIN
   if [[ "$PLAY_AGAIN" != "yes" ]]; then
-    echo "Goodbye! Thanks for playing."
-    break
+      echo "Goodbye! Thanks for playing."
+      break
   fi
 done
