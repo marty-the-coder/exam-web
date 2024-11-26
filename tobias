@@ -1,1 +1,41 @@
 #!/bin/bash
+
+
+
+curl "https://api.open-meteo.com/v1/forecast?latitude=59.9139&longitude=10.7522&current=temperature_2m" | jq '.current' > weather.html
+
+#making a variable that extacts the coordinates of the random city the user will guess the temperature in
+city_coordinates() {
+    #We used local to make the variables belong to the "city_coordinates" function so that if we use the same variable names later, it doesn't crash 
+    local latitude="$1"
+    local longitude"$2"
+
+    local response=$(curl -s "https")
+
+    local temp=$(echo "$response" | jq '.current_weather.temperature')
+    echo "$temp"
+}
+
+#making a loop that keeps going until 
+while true; do
+
+    #Making a variable for the temperature at the given latitude and longitude
+    temperature=$()
+
+    #Asking the user if they want to play again
+    echo "Do you want to try again? (y/n)"
+    read -r replay
+    #checking if the user wants to play again or not
+    #At first, we had "if [[ "$replay" = "n" ]]; then", but we felt that it was more natural that if the user writes something random then they stop the game, rather 
+        #than continuing, so we decided to change that:
+        #We now have that if the answer is not "y", then the program stops and prints out the break message
+    if [[ "$replay" != "y" ]]; then 
+        #The message we print out to the user if they decided to quit the game
+        echo "Alright then, see you later!"
+        break
+    #if the user does anything other than answer "n", then we continue
+    else
+        continue
+    fi
+
+done
