@@ -1,11 +1,49 @@
 #!/bin/bash
-Hei
 
-echo "hei"
+# List of cities
+CITIES=("New York" "London" "Paris" "Tokyo" "Mumbai" "Sydney" "Berlin" "Cairo" "Moscow" "Beijing")
 
-echo "nico lukter rart"
+# OpenWeatherMap API Key (replace with your API key)
+API_KEY="your_openweathermap_api_key"
 
-echo "robin tar på barn"
+# Function to get the temperature for a city
+get_temperature() {
+  local city="$1"
+  local response=$(curl -s "http://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${API_KEY}&units=metric")
+  local temp=$(echo "$response" | jq '.main.temp')
+  echo "$temp"
+}
 
-$ curl "https://api.open-meteo.com/v1/forecast?latitude=52.52&longitude=13.41&
-current=temperature_2m,wind_speed_10m&hourly=temperature_2m,relative_humidity_2m,wind_speed_10m"
+# Game loop
+while true; do
+  # Pick a random city
+  RANDOM_CITY=${CITIES[$RANDOM % ${#CITIES[@]}]}
+  echo "Guess the current temperature in ${RANDOM_CITY}:"
+  read -r USER_GUESS
+
+  # Fetch actual temperature
+  ACTUAL_TEMP=$(get_temperature "$RANDOM_CITY")
+
+  # Handle API errors
+  if [[ "$ACTUAL_TEMP" == "null" ]]; then
+    echo "Failed to get the temperature for ${RANDOM_CITY}. Please try again."
+    continue
+  fi
+
+  # Compare guess with actual temperature
+  DIFF=$(echo "$ACTUAL_TEMP - $USER_GUESS" | bc | tr -d -)
+  if (( $(echo "$DIFF < 5" | bc -l) )); then
+    echo "Congratulations! The actual temperature in ${RANDOM_CITY} is ${ACTUAL_TEMP}°C. You were close!"
+  else
+    echo "Sorry, the actual temperature in ${RANDOM_CITY} is ${ACTUAL_TEMP}°C. Better luck next time!"
+  fi
+
+  # Ask if the user wants to play again
+  echo "Do you want to play again? (yes/no)"
+  read -r PLAY_AGAIN
+  if [[ "$PLAY_AGAIN" != "yes" ]]; then
+    echo "Goodbye! Thanks for playing."
+    break
+  fi
+done
+
