@@ -1,0 +1,69 @@
+#!/bin/bash
+
+# OpenWeatherMap API Key (replace with your API key)
+API_KEY="your_openweathermap_api_key"
+
+# Function to fetch cities from the public link
+fetch_cities() {
+  curl -s "https://nicolbus.folk.ntnu.no/cities"
+}
+
+# Function to get the temperature for a city using latitude and longitude
+get_temperature_by_coords() {
+  local lat="$1"
+  local lon="$2"
+  # Fetch the weather data
+  local response=$(curl -s "http://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${API_KEY}&units=metric")
+  echo "API Response: $response" # Debug line to log the full API response
+
+  # Extract the temperature
+  local temp=$(echo "$response" | jq '.main.temp')
+  echo "$temp"
+}
+
+# Fetch the list of cities
+CITY_DATA=$(fetch_cities)
+if [[ -z "$CITY_DATA" ]]; then
+  echo "Failed to fetch cities from the link. Exiting."
+  exit 1
+fi
+
+# Parse the city data into an array
+IFS=$'\n' read -r -d '' -a CITIES <<< "$CITY_DATA"
+
+# Game loop
+while true; do
+  # Pick a random city
+  RANDOM_CITY_INFO=${CITIES[$RANDOM % ${#CITIES[@]}]}
+  CITY_NAME=$(echo "$RANDOM_CITY_INFO" | cut -d',' -f1)
+  LATITUDE=$(echo "$RANDOM_CITY_INFO" | cut -d',' -f2)
+  LONGITUDE=$(echo "$RANDOM_CITY_INFO" | cut -d',' -f3)
+
+  echo "Guess the current temperature in ${CITY_NAME}:"
+  read -r USER_GUESS
+
+  # Fetch actual temperature
+  ACTUAL_TEMP=$(get_temperature_by_coords "$LATITUDE" "$LONGITUDE")
+
+  # Handle API errors
+  if [[ "$ACTUAL_TEMP" == "null" ]]; then
+    echo "Failed to get the temperature for ${CITY_NAME}. Please try again."
+    continue
+  fi
+
+  # Compare guess with actual temperature
+  DIFF=$(echo "$ACTUAL_TEMP - $USER_GUESS" | bc | tr -d -)
+  if (( $(echo "$DIFF < 5" | bc -l) )); then
+    echo "Congratulations! The actual temperature in ${CITY_NAME} is ${ACTUAL_TEMP}°C. You were close!"
+  else
+    echo "Sorry, the actual temperature in ${CITY_NAME} is ${ACTUAL_TEMP}°C. Better luck next time!"
+  fi
+
+  # Ask if the user wants to play again
+  echo "Do you want to play again? (yes/no)"
+  read -r PLAY_AGAIN
+  if [[ "$PLAY_AGAIN" != "yes" ]]; then
+    echo "Goodbye! Thanks for playing."
+    break
+  fi
+done
