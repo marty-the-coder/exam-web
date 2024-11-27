@@ -33,8 +33,26 @@ if [[ -z "$city_data" ]]; then
   exit 1
 fi
 
-#making a loop that keeps going until 
+#making a game loop
 while true; do
+    #randomly selecting the city that the user will guess the temperature in
+        #Getting all the weather information from the city the user is guessing
+        #Using printf to print out the weather information and "%s\n" to make 
+        #it print every new element on a new line to make it easier to filter
+        #out and extract the right information from the array. We used "| shuf"
+        #to shuffle the lines and using "-n 1" to randomly select one line so
+        #that the user only guesses on one random cty
+    random_city_info=$(printf "%s\n" "${cities[@]}" | shuf -n 1)
+    #Getting the information from the "random_city_info" and splitting the string
+        #at the comma using "| cut -d','" and "-f1" to cut the first field which is  
+        #the city name
+    city_name=$(echo "$random_city_info" | cut -d',' -f1)
+    #doing the same as the last line, but using "-f2" instead to extract the second
+        #part between the first and second comma, which is the latitude value 
+    latitude=$(echo "$random_city_info" | cut -d',' -f2)
+    #the same as the last line, but "-f3" extracts the third value between the 
+        #second and third comma, which is the longitude value
+    longitude=$(echo "$random_city_info" | cut -d',' -f3)
 
     #Making a variable for the temperature at the given latitude and longitude
     temperature=$()
