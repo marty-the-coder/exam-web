@@ -1,18 +1,26 @@
 #!/bin/bash
+#creating a function that extracts the list of cities we made from Nicolais folksite and using "-s" to suppress the output
+cities_list() {
+    curl -s "https://nicobus.folk.ntnu.no/cities"
+}
 
-
-
-curl "https://api.open-meteo.com/v1/forecast?latitude=59.9139&longitude=10.7522&current=temperature_2m" | jq '.current' > weather.html
-
-#making a variable that extacts the coordinates of the random city the user will guess the temperature in
+#making a variable that extracts the coordinates of the random city the user will guess the temperature in
 city_coordinates() {
     #We used local to make the variables belong to the "city_coordinates" function so that if we use the same variable names later, it doesn't crash 
+    #retrieving the values from the cities.txt file with "$1" and "$2"
     local latitude="$1"
     local longitude"$2"
 
-    local response=$(curl -s "https")
+    #Getting the weather information with the "curl" command about the different cities from the open-meteo API and using "-s" to 
+        #suppress the output so that we can create the output that we want to instead and making it into a variable that we used
+        #in the next section
+    local response=$(curl -s "https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true")
 
+    #making a new local variable where we print out the "response" variable from the last part and then using "| jq" to extract 
+        #a specific part. In this case we only want the temperature, so we used '.current_weather.temperature' to extract only the
+        #temperature from the weather API
     local temp=$(echo "$response" | jq '.current_weather.temperature')
+    #printing out the temperature using the variable created in the last line
     echo "$temp"
 }
 
