@@ -24,6 +24,15 @@ city_coordinates() {
     echo "$temp"
 }
 
+#making a variable and storing the information from the "cities_list" variable into this new one 
+city_data=$(cities_list)
+#Checking if the strin "city_data" is empty using "-z" 
+if [[ -z "$city_data" ]]; then
+    #If the string is empty, then we print out this message and exits the script
+  echo "Failed to fetch city data. Exiting."
+  exit 1
+fi
+
 #making a loop that keeps going until 
 while true; do
 
