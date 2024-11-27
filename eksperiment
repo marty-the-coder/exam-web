@@ -74,7 +74,7 @@ while true; do
       break
   fi
 
-# "!" means not, "[[ "$user_guess" =~ ... ]]:"" Checks if the users input matches the specified pattern. "^" is the start of the input, "-?" allows it to
+# "!" means not, "[[ "$user_guess" =~ ... ]]:"" Checks if the users input is actualy a number. "^" is the start of the input, "-?" allows it to
   # use negative numbers, "[0-9]+" will match single digits from 0 - 9, and the "+" does so it allows multiple digits. "\" does so it treats the "." as a plain dot
   # so you can write for example 14.7 when guessing the Celsius degrees. the "?" at the end does so you have the option to include a "." in your guess, or not. 
   if ! [[ "$user_guess" =~ ^-?[0-9]+(\.[0-9]+)?$ ]]; then
