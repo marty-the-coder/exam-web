@@ -39,6 +39,44 @@ while true; do
     #Making a variable for the temperature at the given latitude and longitude
     temperature=$()
 
+# if the user want to quit, the quit option is stored in the same variable where the user needs to guess a cities temperature.
+  # they get the option to write "quit" and when they write it, this will print the message "Goodbye! thanks for playing."
+  if [[ "$USER_GUESS" == "quit" ]]; then
+      echo "Goodbye! Thanks for playing."
+      break
+  fi
+
+# "!" means not, "[[ "$user_guess" =~ ... ]]:"" Checks if the users input matches the specified pattern. "^" is the start of the input, "-?" allows it to
+  # use negative numbers, "[0-9]+" will match single digits from 0 - 9, and the "+" does so it allows multiple digits. "\" does so it treats the "." as a plain dot
+  # so you can write for example 14.7 when guessing the Celsius degrees. the "?" at the end does so you have the option to include a "." in your guess, or not. 
+  if ! [[ "$user_guess" =~ ^-?[0-9]+(\.[0-9]+)?$ ]]; then
+      echo "Please enter a valid number for the temperature."
+      continue
+  fi
+
+  # This code asks the get_temperature_by_coords function to get the current temperature for a city's location and saves it in the variable actual_temp. 
+  # this value is used to compare it with the user's guess.
+  actual_temp=$(get_temperature_by_coords "$latitude" "$longitude")
+
+  # This checks if the value of actual_temp (the temperature fetched from the API) is "null".
+# "null" means the API didn't return a valid temperature, because of network issues, invalid coordinates, or API server problems).
+    if [[ "$ACTUAL_TEMP" == "null" ]]; then
+    # So if it is "null" it will display this message
+      echo "Failed to fetch the temperature for ${CITY_NAME}. Please try again."
+      continue
+  fi
+
+# "diff" will compare the users guessed temperature to the actual temperature. The "bc" command is used as for doing math like a calculator
+  # "tr -d" will remove the minus sign to make the difference always be positive.
+  diff=$(echo "$actual_temp - $user_guess" | bc | tr -d -)
+  # if the gussed temperature is "< 3"(3 or less), then it is close enough for it do be correct.
+  if (( $(echo "$diff < 3" | bc -l) )); then
+      # Here it will fetch the city_name and acutal_temp and display it if the guess was within the threshhold or not.
+      echo "Congratulations! The actual temperature in ${city_name} is ${actual_temp}°C. You were close!"
+  else
+      echo "Sorry, the actual temperature in ${city_name} is ${actual_temp}°C. Better luck next time!"
+  fi
+
     #Asking the user if they want to play again
     echo "Do you want to try again? (y/n)"
     read -r replay
