@@ -1,0 +1,57 @@
+#!/bin/bash
+
+# Function to fetch city info from the provided URL
+fetch_random_city() {
+  curl -s --max-time 5 "https://nicolbus.folk.ntnu.no/cities" | shuf -n 1
+}
+
+# Function to get temperature from Open-Meteo API
+get_temperature_by_coords() {
+  local lat="$1"
+  local lon="$2"
+  local response=$(curl -s --max-time 5 "https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true")
+  local temp=$(echo "$response" | jq -r '.current_weather.temperature // "null"')
+  [[ "$temp" == "null" ]] && return 1
+  echo "$temp"
+}
+
+# Main game loop
+while true; do
+  # Fetch random city
+  RANDOM_CITY_INFO=$(fetch_random_city)
+  CITY_NAME=$(echo "$RANDOM_CITY_INFO" | cut -d',' -f1)
+  LATITUDE=$(echo "$RANDOM_CITY_INFO" | cut -d',' -f2)
+  LONGITUDE=$(echo "$RANDOM_CITY_INFO" | cut -d',' -f3)
+
+  # Validate city info
+  [[ -z "$CITY_NAME" || -z "$LATITUDE" || -z "$LONGITUDE" ]] && continue
+
+  # User guess
+  echo "Guess the current temperature in ${CITY_NAME} (type 'quit' to exit):"
+  read -r USER_GUESS
+  [[ "$USER_GUESS" == "quit" ]] && echo "Goodbye! Thanks for playing." && break
+  [[ ! "$USER_GUESS" =~ ^-?[0-9]+(\.[0-9]+)?$ ]] && echo "Please enter a valid number." && continue
+
+  # Fetch actual temperature
+  ACTUAL_TEMP=$(get_temperature_by_coords "$LATITUDE" "$LONGITUDE")
+  if [[ $? -ne 0 ]]; then
+    echo "Failed to fetch the temperature for ${CITY_NAME}. Please try again."
+    continue
+  fi
+
+# Calculate the absolute difference
+DIFF=$(echo "$ACTUAL_TEMP - $USER_GUESS" | bc | tr -d -)
+if (( $(echo "$DIFF < 5" | bc -l) )); then
+    echo "Congratulations! The actual temperature in ${CITY_NAME} is ${ACTUAL_TEMP}°C. You were close!"
+else
+    echo "Sorry, the actual temperature in ${CITY_NAME} is ${ACTUAL_TEMP}°C. Better luck next time!"
+fi
+
+  # Ask to play again
+  echo "Play again? (yes/no)"
+  read -r PLAY_AGAIN
+  case "$PLAY_AGAIN" in
+    [Yy]*) ;; # Continue the game
+    *) echo "Goodbye! Thanks for playing."; break;;
+  esac
+done
