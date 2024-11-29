@@ -1,0 +1,14 @@
+#!/bin/bash
+
+cities=$(curl -s "https://nicolbus.folk.ntnu.no/cities")
+
+echo "Content-type: text/html"
+echo ""
+
+echo '
+<h1>Weather guessing game</h1>
+<form method="POST">
+<label for="temp">Guess the temperature in a city:</label>
+<input type="number" name="tempInput"  id="temp">
+<button type="submit">Submit</button>
+</form>'
