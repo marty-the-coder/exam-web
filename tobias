@@ -1,23 +1,24 @@
+
+
 #!/bin/bash
 
-
 #creating a function that extracts the list of cities we made from Nicolais folksite and using "-s" to suppress the output
-cities_list() {
-    curl -s "https://nicobus.folk.ntnu.no/cities"
+fetch_cities() {
+  curl -s "https://nicolbus.folk.ntnu.no/cities"
 }
 
 #making a variable that extracts the coordinates of the random city the user will guess the temperature in
-city_coordinates() {
+get_temperature_by_coords() {
     #We used local to make the variables belong to the "city_coordinates" function so that if we use the same variable names later, it doesn't crash 
     #retrieving the values from the cities.txt file with "$1" and "$2"
-    local latitude="$1"
-    local longitude"$2"
-
+    local lat="$1"
+    local lon="$2"
+  
     #Getting the weather information with the "curl" command about the different cities from the open-meteo API and using "-s" to 
     #suppress the output so that we can create the output that we want to instead and making it into a variable that we used
     #in the next section
-    local response=$(curl -s "https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true")
-
+    local response=$(curl -s "https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true")
+  
     #making a new local variable where we print out the "response" variable from the last part and then using "| jq" to extract 
     #a specific part. In this case we only want the temperature, so we used '.current_weather.temperature' to extract only the
     #temperature from the weather API
@@ -26,27 +27,33 @@ city_coordinates() {
     echo "$temp"
 }
 
-#making a variable and storing the information from the "cities_list" variable into this new one 
-city_data=$(cities_list)
-#Checking if the strin "city_data" is empty using "-z" 
-if [[ -z "$city_data" ]]; then
-    #If the string is empty, then we print out this message and exits the script
-    echo "Failed to fetch city data. You are now exiting the game"
-    #exiting the script and using "1" to indicate that the script did not run successfully (if te script ran successfully, we would have used 0)
+# Ensure jq is installed
+if ! command -v jq &> /dev/null; then
+    echo "Error: jq is not installed. Please install jq to run this script."
     exit 1
 fi
 
-#need to learn and explain this line of code
-IFS=$'\n' read -r -d '' -a cities <<< $city_data
+#making a variable and storing the information from the "cities_list" variable into this new one 
+CITY_DATA=$(fetch_cities)
+#Checking if the strin "city_data" is empty using "-z" 
+if [[ -z "$CITY_DATA" ]]; then
+    #If the string is empty, then we print out this message and exits the script
+    echo "Failed to fetch city data. Exiting."
+    #exiting the script and using "1" to indicate that the script did not run 
+    #successfully (if te script ran successfully, we would have used 0)
+    exit 1
+fi
+
+# Convert city data into an array
+IFS=$'\n' read -r -d '' -a CITIES <<< "$CITY_DATA"
 
 #making a function that checks if the city list (array) is empty
 #"-eq" is used to check if something is "equal to" something, so we used "-eq 0"
 #to check if the array is equal to zero (empty)
-if [[ ${#cities[@]} -eq 0 ]]; then
+if [[ ${#CITIES[@]} -eq 0 ]]; then
     #printing out a message that shows if the list that is curled in the beginning
     #has no cities in it that can be used in the guessing game
-    echo "There are no cities in the list, maybe you have to make another one. You
-    are now exiting..."
+    echo "No cities found in the list. Exiting."
     #Exiting the script and indicates that the script did not run successfully
     exit 1
 fi
@@ -60,80 +67,83 @@ while true; do
     #out and extract the right information from the array. We used "| shuf"
     #to shuffle the lines and using "-n 1" to randomly select one line so
     #that the user only guesses on one random cty
-    random_city_info=$(printf "%s\n" "${cities[@]}" | shuf -n 1)
+    RANDOM_CITY_INFO=$(printf "%s\n" "${CITIES[@]}" | shuf -n 1)
     #Getting the information from the "random_city_info" and splitting the string
     #at the comma using "| cut -d','" and "-f1" to cut the first field which is  
     #the city name
-    city_name=$(echo "$random_city_info" | cut -d',' -f1)
+    CITY_NAME=$(echo "$RANDOM_CITY_INFO" | cut -d',' -f1)
     #doing the same as the last line, but using "-f2" instead to extract the second
-    #part between the first and second comma, which is the latitude value 
-    latitude=$(echo "$random_city_info" | cut -d',' -f2)
+    #part between the first and second comma, which is the latitude value
+    LATITUDE=$(echo "$RANDOM_CITY_INFO" | cut -d',' -f2)
     #the same as the last line, but "-f3" extracts the third value between the 
     #second and third comma, which is the longitude value
-    longitude=$(echo "$random_city_info" | cut -d',' -f3)
+    LONGITUDE=$(echo "$RANDOM_CITY_INFO" | cut -d',' -f3)
+
+    # Ensure the selected city data is valid
+    if [[ -z "$CITY_NAME" || -z "$LATITUDE" || -z "$LONGITUDE" ]]; then
+        echo "Malformed city data. Skipping."
+        continue
+    fi
 
     # Ask the user to guess the temperature and read the ansswer that the user inputs
-    echo "Guess the current temperature in ${city_name} (type 'quit' to exit):"
+    echo "Guess the current temperature in ${CITY_NAME} (type 'quit' to exit):"
     #-r is used to read the answer literally (not removing any parts)
-    read -r user_guess
+    read -r USER_GUESS
 
     #making a condition that checks if the user writes "quit" to give the user an option
     #to back out even if they have already types yes
-    if [[ "$users_guess" == "quit" ]]; then
-        #If they type quit, then we print out this message and then exit out the script
-        echo "Hmmm... I guess if you don't want to play, we'll have to say goodbye"
+    if [[ "$USER_GUESS" == "quit" ]]; then
+        echo "Goodbye! Thanks for playing."
         break
     fi
 
     # "!" means not, "[[ "$user_guess" =~ ... ]]:"" Checks if the users input is actualy a number. "^" is the start of the input, "-?" allows it to
     # use negative numbers, "[0-9]+" will match single digits from 0 - 9, and the "+" does so it allows multiple digits. "\" does so it treats the "." as a plain dot
-    # so you can write for example 14.7 when guessing the Celsius degrees. the "?" at the end does so you have the option to include a "." in your guess, or not. 
-    if ! [[ "$user_guess" =~ ^-?[0-9]+(\.[0-9]+)?$ ]]; then
+    # so you can write for example 14.7 when guessing the Celsius degrees. the "?" at the end does so you have the option to include a "." in your guess, or not.
+    if ! [[ "$USER_GUESS" =~ ^-?[0-9]+(\.[0-9]+)?$ ]]; then
         echo "Please enter a valid number for the temperature."
         continue
     fi
 
     # This code asks the get_temperature_by_coords function to get the current temperature for a city's location and saves it in the variable actual_temp. 
     # this value is used to compare it with the user's guess.
-    temperature=$(temperature_by_coordinates "$latitude" "$longitude")
+    ACTUAL_TEMP=$(get_temperature_by_coords "$LATITUDE" "$LONGITUDE")
 
     # This checks if the value of actual_temp (the temperature fetched from the API) is "null".
     # "null" means the API didn't return a valid temperature, because of network issues, invalid coordinates, or API server problems).
-    if [[ "$temperature" == "null" ]]; then
+    if [[ "$ACTUAL_TEMP" == "null" ]]; then
         # So if it is "null" it will display this message
-        echo "Failed to fetch the temperature for ${city_name}. Please try again."
+        echo "Failed to fetch the temperature for ${CITY_NAME}. Please try again."
         continue
     fi
 
-    # Compare the guessed and actual temperatures
-    temp_difference=$(echo "$temperature - $user_guess" | bc | tr -d -)
+    # "DIFF" will compare the users guessed temperature to the actual temperature. The "bc" command is used as for doing math like a calculator
+    # "tr -d" will remove the minus sign to make the difference always be positive.
+    DIFF=$(echo "$ACTUAL_TEMP - $USER_GUESS" | bc | tr -d -)
+  
     #making a condition that checks if the temperature difference between the guessed temperature
     #from the user and the actual temperature is less than 3 degrees. We used "| bc -l" to 
     #because "bc" does the math in the function, but we added "-l" so that the function is able
     #to return decimals, so it gives us a more precise result
-    if (( $(echo "$temp_difference -lt 3" | bc -l) )); then
+    if (( $(echo "$DIFF < 3" | bc -l) )); then
         #if the difference in temperature is less than 3, we print out this message
-        echo "Congratulations! The actual temperature in ${city_name} is ${temperature}°C. You were close!"
+        echo "Congratulations! The actual temperature in ${CITY_NAME} is ${ACTUAL_TEMP}°C. You were close!"
     else
         #else we print out this message
-        echo "Sorry, the actual temperature in ${city_name} is ${temperature}°C. Better luck next time!"
+        echo "Sorry, the actual temperature in ${CITY_NAME} is ${ACTUAL_TEMP}°C. Better luck next time!"
     fi
 
     #Asking the user if they want to play again
-    echo "Do you want to try again? (yes or no)"
-    read replay
+    echo "Do you want to play again? (yes/no)"
+    read -r PLAY_AGAIN
+
     #checking if the user wants to play again or not
     #At first, we had "if [[ "$replay" = "no" ]]; then", but we felt that it was more natural that if the user writes something random then they stop the game, rather 
     #than continuing, so we decided to change that:
     #We now have that if the answer is not "y", then the program stops and prints out the break message
-    if [[ "$replay" != "yes" ]]; then 
+    if [[ "$PLAY_AGAIN" != "yes" ]]; then
         #The message we print out to the user if they decided to quit the game
-        echo "Alright then, see you later!"
+        echo "Goodbye! Thanks for playing."
         break
-    #if the user does anything other than answer "n", then we continue
-    else
-        continue
     fi
-
 done
-
