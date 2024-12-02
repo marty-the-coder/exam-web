@@ -122,3 +122,92 @@ while true; do
     fi
 
 done
+
+
+ NY!
+#!/bin/bash
+
+echo "Content-type: text/html"
+echo ""  # Blank line required between headers and body
+echo "<html>"
+echo "<body style='background-color: lightblue; margin-top: 150px;'>"
+echo "<center>"
+
+echo "<h1>Guess the Temperature Game!</h1>"
+
+# Function to fetch random city info from the cities.txt file
+fetch_random_city() {
+  # Fetch a random line from the cities.txt file
+  RANDOM_CITY_INFO=$(shuf -n 1 /var/www/html/cities.txt)
+  echo "$RANDOM_CITY_INFO"
+}
+
+# Function to get temperature from Open-Meteo API
+get_temperature_by_coords() {
+  local lat="$1"
+  local lon="$2"
+  local response=$(curl -s "https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true")
+  local temp=$(echo "$response" | jq -r '.current_weather.temperature // "null"')
+  [[ "$temp" == "null" ]] && return 1
+  echo "$temp"
+}
+
+# Handle form submission (checking if user made a guess)
+if [ "$QUERY_STRING" ]; then
+  # Extract user guess from form submission
+  guess=$(echo $QUERY_STRING | sed -n 's/.*user_guess=\([^&]*\).*/\1/p')
+  
+  # Get city info (saved from last request or picked randomly)
+  CITY_NAME=$(echo $QUERY_STRING | sed -n 's/.*city_name=\([^&]*\).*/\1/p')
+  LATITUDE=$(echo $QUERY_STRING | sed -n 's/.*latitude=\([^&]*\).*/\1/p')
+  LONGITUDE=$(echo $QUERY_STRING | sed -n 's/.*longitude=\([^&]*\).*/\1/p')
+
+  # Fetch actual temperature for the city
+  ACTUAL_TEMP=$(get_temperature_by_coords "$LATITUDE" "$LONGITUDE")
+  if [[ $? -ne 0 ]]; then
+    echo "<p>Failed to fetch the temperature for ${CITY_NAME}. Please try again.</p>"
+    exit 1
+  fi
+
+  # Calculate the absolute difference between the guess and the actual temperature
+  DIFF=$(echo "$ACTUAL_TEMP - $guess" | bc | tr -d -)
+
+  # Display the result of the guess
+  echo "<h2>City: ${CITY_NAME}</h2>"
+  echo "<p>Your guess: ${guess}&deg;C</p>"
+  echo "<p>Actual temperature: ${ACTUAL_TEMP}&deg;C</p>"
+
+  if (( $(echo "$DIFF < 5" | bc -l) )); then
+    echo "<p>Congratulations! You were close!</p>"
+  else
+    echo "<p>Better luck next time!</p>"
+  fi
+
+  # Ask to play again
+  echo "<p>Play again? <a href='eksamen1.sh'>Yes</a> | <a href='?quit=true'>No</a></p>"
+
+  # If the user clicked 'No', quit the game
+  if [[ "$QUERY_STRING" == *"quit=true"* ]]; then
+    echo "<p>Goodbye! Thanks for playing.</p>"
+    exit 0
+  fi
+
+else
+  # Display the guess input form with a new random city if the page is being loaded for the first time
+  RANDOM_CITY_INFO=$(fetch_random_city)
+  CITY_NAME=$(echo "$RANDOM_CITY_INFO" | cut -d',' -f1)
+  LATITUDE=$(echo "$RANDOM_CITY_INFO" | cut -d',' -f2)
+  LONGITUDE=$(echo "$RANDOM_CITY_INFO" | cut -d',' -f3)
+
+  echo "<h2>Guess the current temperature in ${CITY_NAME}:</h2>"
+  echo "<p>Type your guess in Celsius and submit.</p>"
+  echo "<form method='get' action='eksamen1.sh'>"
+  echo "<input type='text' name='user_guess' placeholder='Enter your guess' />"
+  echo "<input type='hidden' name='city_name' value='${CITY_NAME}' />"
+  echo "<input type='hidden' name='latitude' value='${LATITUDE}' />"
+  echo "<input type='hidden' name='longitude' value='${LONGITUDE}' />"
+  echo "<input type='submit' value='Submit' />"
+  echo "</form>"
+fi
+
+echo "</body></html>"
