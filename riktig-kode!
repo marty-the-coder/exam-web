@@ -21,11 +21,21 @@ get_temperature_by_coords() {
 }
 
 # Handle form submission (checking if user made a guess)
+# The QUERY_STRING contains data in the form of key=value pairs.
+#It’s used to send data from the client (user's browser) to the server (the script) in a URL when a form is submitted via the GET method.
+#In your script, QUERY_STRING helps to extract and use data (such as the user's guess and city details) to process the temperature comparison.
+# example: user_guess=25&city_name=New%20York&latitude=40.7128&longitude=-74.0060
 if [ "$QUERY_STRING" ]; then
   # Extract user guess from form submission
   guess=$(echo $QUERY_STRING | sed -n 's/.*user_guess=\([^&]*\).*/\1/p')
   
   # Get city info (saved from last request or picked randomly)
+#user_guess=25&city_name=New%20York&latitude=40.7128&longitude=-74.0060
+#The expression 's/.*city_name=\([^&]*\).*/\1/p' works as follows:
+#It looks for city_name= in the string.
+#It captures everything after city_name= until it encounters an & (or the end of the string), which is New%20York (the city name).
+#The \1 refers to this captured part, so the result will be New%20York.
+#The p flag tells sed to print New%20York.
   CITY_NAME=$(echo $QUERY_STRING | sed -n 's/.*city_name=\([^&]*\).*/\1/p')
   LATITUDE=$(echo $QUERY_STRING | sed -n 's/.*latitude=\([^&]*\).*/\1/p')
   LONGITUDE=$(echo $QUERY_STRING | sed -n 's/.*longitude=\([^&]*\).*/\1/p')
