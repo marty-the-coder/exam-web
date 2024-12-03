@@ -1,0 +1,67 @@
+#!/bin/bash
+
+source ./auth.sh
+
+# Check if user is logged in
+if ! is_logged_in; then
+    echo "You need to log in to play the game."
+    echo "1. Sign up"
+    echo "2. Log in"
+    echo "3. Exit"
+    read -r choice
+
+    case $choice in
+    1)
+        sign_up || exit 1
+        ;;
+    2)
+        log_in || exit 1
+        ;;
+    3)
+        echo "Goodbye!"
+        exit 0
+        ;;
+    *)
+        echo "Invalid option."
+        exit 1
+        ;;
+    esac
+fi
+
+# Proceed to game
+username=$(cat "$SESSION_FILE")
+echo "Welcome to the game, $username!"
+
+# Your existing game logic
+cities=("London" "New York" "Tokyo" "Mumbai" "Sydney")
+API_KEY="your_openweathermap_api_key"
+
+play_game() {
+    city=${cities[$RANDOM % ${#cities[@]}]}
+
+    echo "Guess the temperature in $city:"
+    read -r guess
+
+    response=$(curl -s "http://api.openweathermap.org/data/2.5/weather?q=$city&units=metric&appid=$API_KEY")
+    actual_temp=$(echo "$response" | jq '.main.temp')
+
+    diff=$(( ${guess%%.*} - ${actual_temp%%.*} ))
+    diff=${diff#-}
+
+    if [ "$diff" -le 5 ]; then
+        echo "You won! The actual temperature in $city is $actual_temp°C."
+    else
+        echo "You lost. The actual temperature in $city is $actual_temp°C."
+    fi
+
+    echo "Do you want to play again? (yes/no)"
+    read -r play_again
+    if [[ "$play_again" == "yes" || "$play_again" == "y" ]]; then
+        play_game
+    else
+        echo "Goodbye!"
+        exit 0
+    fi
+}
+
+play_game
