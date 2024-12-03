@@ -95,7 +95,7 @@ if [ "$QUERY_STRING" ]; then
 
   # Asking the player if they want to play again. If they press "yes", we send them 
   # back to the start page with the game, if not we make them quit the game
-  echo "<p>Play again? <a href='eksamen1.sh'>Yes</a> | <a href='?quit=true'>No</a></p>"
+  echo "<p>Play again? <a href='exam.sh'>Yes</a> | <a href='?quit=true'>No</a></p>"
 
   # Making an if statement that checks if the user pressed "No"
   if [[ "$QUERY_STRING" == *"quit=true"* ]]; then
@@ -124,7 +124,7 @@ else
   echo "<h2>Guess the current temperature in ${CITY_NAME}:</h2>"
   echo "<p>Type your guess in Celsius and submit.</p>"
   # Using the for method='get' so the data will be appended to the URL
-  echo "<form method='get' action='eksamen1.sh'>"
+  echo "<form method='get' action='exam.sh'>"
   echo "<input type='text' name='user_guess' placeholder='Enter your guess' />"
   # Storing the "city_name" value when the form is submitted (the user does not see this value)
   echo "<input type='hidden' name='city_name' value='${CITY_NAME}' />"
