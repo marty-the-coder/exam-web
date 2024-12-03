@@ -1,0 +1,57 @@
+#!/bin/bash
+
+#i make a variable (output_file) for the temperature_data.json. the json file is where the cities with temperature should be saved
+output_file="/home/marteck/eksamen8/temperature_data.json"
+
+# i make a variable (input_file) for the txt file that contains all the cities and coordinates
+input_file="/home/marteck/eksamen8/cities.txt"
+
+#here i make a function named "fetch_temperature" for getting the temperature from all the cities
+#"local" makes the variables only be variables in this function so it doesnÂ´t confuse later in the script
+fetch_temperature() {
+    local latitude="$1" #latitude is the name of the variable. the $1 represents the first argument passed to the function
+    local longitude="$2" #her longitude is the name of the variable. the $2 represents the second argument passed to the function.
+    #"curl" is a command-line tool used to make HTTP requests and the -s option stands for "silent," which means that curl will not show progress or error messages.
+    #it will only output the response.
+    #the current_weather=true parameter tells the script that we want the current weather data.
+    local response=$(curl -s "https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true") #response is the variable.
+    #in the temp i echo the response which outputs the content of the response variable, which contains the JSON data returned by the API.
+    #jq is a command-line tool for processing JSON data. 
+    #the expression ".current_weather.temperature" tells jq to extract the value of the temperature field from the current_weather object in the JSON data.
+    local temp=$(echo "$response" | jq '.current_weather.temperature') #temp is the variable
+    echo "$temp" #then i echo the temp
+}
+
+#echo the "[" in the output file since its a JSON file and i need to define the arrays
+echo "[" > "$output_file"
+
+#then i start a while loop that will continue to execute as long as there are lines to read from the input file
+while IFS=',' read -r city_name latitude longitude; do
+  #i set the Internal Field Separator (IFS) to comma, which tells the shell to treat commas as the delimiter for separating fields in each line of the input file
+  #this is very important for correctly parsing CSV data
+  
+  #"read" a single line of input and split it into variables based on the IFS delimiter
+  #the "-r" option prevents backslashes from being interpreted as escape characters, allowing the input to be read literally
+  #the variables city_name, latitude, and longitude will be populated with the corresponding values from the current line of the input file
+  
+  #make a function named fetch_temperature, passing the latitude and longitude variables as arguments
+  #the function is expected to return the temperature for the given coordinates
+  #the output of the function is captured and stored in the variable temperature using command substitution
+  temperature=$(fetch_temperature "$latitude" "$longitude")
+  
+  #append the temperature data to the output file
+  #construct a JSON-formatted string that includes the city name and its corresponding temperature
+  #the string is formatted as: {"city":"<city_name>", "temperature":<temperature>}
+  #the double quotes around the city name are escaped with backslashes (\") to ensure they are included in the output string
+  echo "{\"city\":\"$city_name\", \"temperature\":$temperature}," >> "$output_file"
+  
+  #the >> operator appends the constructed JSON string to the file specified by the variable output_file
+  #if the file does not exist, it will be created. If it does exist, the new data will be added to the end of the file without overwriting the existing content
+  
+done < "$input_file"
+#mark the end of the while loop
+#the < "$input_file" part redirects the contents of the file specified by input_file into the loop, allowing the read command to read from it line by line"
+
+#remove the last comma and close the JSON array
+sed -i '$ s/,$//' "$output_file"  #remove the last comma
+echo "]" >> "$output_file"        #close the JSON array
