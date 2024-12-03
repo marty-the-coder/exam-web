@@ -1,69 +1,68 @@
 #!/bin/bash
 
+# This line tells the system that this is a Bash script
+
 echo "Content-type: text/html"
-echo ""  # Blank line required between headers and body
+echo ""  # Blank line required between headers and body for the HTML response
 
-# File to store user credentials
-user_file="/var/www/html/users1.txt"
-# File containing the list of cities (Name, Latitude, Longitude)
-cities_file="/var/www/html/cities.txt"
-# File containing the list of city temperatures
-temperature_file="/var/www/html/temperature_data.json"
+# Define the file paths for storing user credentials, city data, and temperature data
+user_file="/var/www/html/users1.txt"  # Path to file that holds user credentials
+cities_file="/var/www/html/cities.txt"  # Path to file with a list of cities (name, latitude, longitude)
+temperature_file="/var/www/html/temperature_data.json"  # Path to a JSON file with city temperatures
 
-# Function to hash passwords
+# Function to hash passwords using SHA-256
 hash_password() {
-  echo -n "$1" | openssl dgst -sha256 | awk '{print $2}'
+  echo -n "$1" | openssl dgst -sha256 | awk '{print $2}'  # Hashes the input (password) and returns only the hashed value
 }
 
-# Function to validate user credentials
+# Function to validate user credentials (username and password)
 validate_user() {
-  local username="$1"
-  local hashed_password="$2"
+  local username="$1"  # The username passed to the function
+  local hashed_password="$2"  # The hashed password passed to the function
+  
+  # Read through each line in the user_file
   while IFS=: read -r file_username file_password; do
-    if [[ "$file_username" == "$username" ]]; then
-      if [[ "$file_password" == "$hashed_password" ]]; then
-        return 0  # Valid credentials
-      fi
+    if [[ "$file_username" == "$username" && "$file_password" == "$hashed_password" ]]; then
+      return 0  # Return 0 if credentials match (valid user)
     fi
   done < "$user_file"
-  return 1  # Invalid credentials
+  return 1  # Return 1 if credentials don't match (invalid user)
 }
 
 # Function to decode URL-encoded strings
 urldecode() {
   local encoded="$1"
-  printf '%b' "${encoded//%/\\x}"
+  printf '%b' "${encoded//%/\\x}"  # Decode percent-encoded characters
 }
 
-# Extract parameters from query string
+# Function to parse the query string (key-value pairs) from the URL
 parse_query_string() {
   local query="$1"
   local key_value
-  IFS='&' read -ra key_value <<< "$query"
+  IFS='&' read -ra key_value <<< "$query"  # Split query string into key-value pairs
   for pair in "${key_value[@]}"; do
-    local key=$(echo "$pair" | cut -d'=' -f1)
-    local value=$(echo "$pair" | cut -d'=' -f2)
-    eval "$key=\"$(urldecode "$value")\""
+    local key=$(echo "$pair" | cut -d'=' -f1)  # Get the key (parameter name)
+    local value=$(echo "$pair" | cut -d'=' -f2)  # Get the value (parameter value)
+    eval "$key=\"$(urldecode "$value")\""  # Assign the decoded value to the corresponding variable
   done
 }
 
-# Check if the query string exists and parse it
+# Check if the query string exists and parse it if so
 if [[ -n "$QUERY_STRING" ]]; then
   parse_query_string "$QUERY_STRING"
 fi
 
-# Handle logout (removes username from URL query string)
+# Handle logout action by checking for 'logout=true' in the query string
 if [[ "$QUERY_STRING" == *"logout=true"* ]]; then
-  echo ""  # Blank line required between headers and body
+  echo ""  # Blank line for HTTP header
   echo "<html><body><center><p>You have been logged out. <a href='eksamen1.sh'>Login again</a>.</p></center></body></html>"
   exit 0
 fi
 
-# Handle login
+# Handle login action (checks if username and password are provided and valid)
 if [[ -n "$username" && -n "$password" && "$action" == "login" ]]; then
-  hashed_password=$(hash_password "$password")
-  if validate_user "$username" "$hashed_password"; then
-    # Redirect to the game page with the username in the query string
+  hashed_password=$(hash_password "$password")  # Hash the provided password
+  if validate_user "$username" "$hashed_password"; then  # Check if the username and hashed password are valid
     echo ""  # End of headers
     echo "<html><body><center><p>Login successful! <a href='eksamen1.sh?play=true&username=$username'>Start the game</a>.</p></center></body></html>"
     exit 0
@@ -74,8 +73,9 @@ if [[ -n "$username" && -n "$password" && "$action" == "login" ]]; then
   fi
 fi
 
-# Handle sign-up
+# Handle sign-up action (checks if the username already exists)
 if [[ -n "$username" && -n "$password" && "$action" == "signup" ]]; then
+  # Check if the username already exists in the user file
   while IFS=: read -r file_username _; do
     if [[ "$file_username" == "$username" ]]; then
       echo ""  # End of headers
@@ -83,38 +83,40 @@ if [[ -n "$username" && -n "$password" && "$action" == "signup" ]]; then
       exit 0
     fi
   done < "$user_file"
+  
+  # If the username doesn't exist, hash the password and add the new user to the user file
   hashed_password=$(hash_password "$password")
-  echo "$username:$hashed_password" >> "$user_file"
+  echo "$username:$hashed_password" >> "$user_file"  # Append the new user to the file
   echo ""  # End of headers
   echo "<html><body><center><p>Signup successful! <a href='eksamen1.sh'>Login now</a>.</p></center></body></html>"
   exit 0
 fi
 
-# Check if user is logged in (username is in the query string) and wants to play the game
+# Check if the user is logged in (username is in the query string) and wants to play the game
 if [[ -n "$username" && "$QUERY_STRING" == *"play=true"* ]]; then
-  echo ""
+  echo ""  # End of headers
   echo "<html><body style='background-color: lightblue; margin-top: 150px;'>"
   echo "<center>"
   echo "<h1>Guess the Temperature Game!</h1>"
   echo "<p>Welcome, $username!</p>"
-  
-  # Fetch a random city from the cities file
-  random_city=$(shuf -n 1 "$cities_file")
-  city_name=$(echo "$random_city" | cut -d',' -f1)
-  latitude=$(echo "$random_city" | cut -d',' -f2)
-  longitude=$(echo "$random_city" | cut -d',' -f3)
 
-  # Get the temperature for the city from the temperature_data.json file using jq
+  # Fetch a random city from the cities file
+  random_city=$(shuf -n 1 "$cities_file")  # Randomly select one city from the list
+  city_name=$(echo "$random_city" | cut -d',' -f1)  # Extract the city name
+  latitude=$(echo "$random_city" | cut -d',' -f2)  # Extract the city latitude
+  longitude=$(echo "$random_city" | cut -d',' -f3)  # Extract the city longitude
+
+  # Get the temperature for the city from the temperature data JSON file using jq
   city_temp=$(jq -r --arg city "$city_name" '.[] | select(.city == $city) | .temperature' "$temperature_file")
 
-  # Form for the user to make a guess
+  # Display a form for the user to make their temperature guess
   echo "<p>Guess the current temperature in $city_name:</p>"
   echo "<form method='get' action='eksamen1.sh'>"
   echo "<input type='text' name='user_guess' placeholder='Enter your guess in Celsius' />"
   echo "<input type='hidden' name='city_name' value='$city_name' />"
   echo "<input type='hidden' name='latitude' value='$latitude' />"
   echo "<input type='hidden' name='longitude' value='$longitude' />"
-  echo "<input type='hidden' name='username' value='$username' />"  # Make sure username is passed here
+  echo "<input type='hidden' name='username' value='$username' />"
   echo "<input type='submit' value='Submit Guess' />"
   echo "</form>"
 
@@ -124,27 +126,29 @@ if [[ -n "$username" && "$QUERY_STRING" == *"play=true"* ]]; then
   exit 0
 fi
 
-# Handle guess submission
+# Handle the guess submission after the user submits their guess
 if [[ -n "$user_guess" && -n "$city_name" && -n "$latitude" && -n "$longitude" && -n "$username" ]]; then
-  # Get the temperature from the JSON file
-  actual_temp=$(jq -r --arg city "$city_name" '.[] | select(.city == $city) | .temperature' "$temperature_file")
-  
-  # Calculate the difference between the guessed temperature and actual temperature
+  actual_temp=$(jq -r --arg city "$city_name" '.[] | select(.city == $city) | .temperature' "$temperature_file")  # Get actual temperature from JSON file
+
+  # Calculate the difference between the guessed temperature and the actual temperature (absolute value)
   diff=$(echo "$user_guess - $actual_temp" | bc | tr -d -)
 
-  echo ""
+  # Show results of the guess
+  echo ""  # Blank line required between headers and body
   echo "<html><body style='background-color: lightblue; margin-top: 150px;'>"
   echo "<center>"
   echo "<h1>Guess the Temperature Game!</h1>"
   echo "<p>Your guess: $user_guess&deg;C</p>"
   echo "<p>Actual temperature: $actual_temp&deg;C</p>"
+  
+  # Check how close the guess is to the actual temperature
   if [[ $(echo "$diff < 5" | bc -l) -eq 1 ]]; then
     echo "<p>Congratulations! You were close!</p>"
   else
     echo "<p>Better luck next time!</p>"
   fi
 
-  # Play again with the username passed correctly in the URL
+  # Provide a link to play again or log out
   echo "<p>Play again? <a href='eksamen1.sh?play=true&username=$username'>Yes</a> | <a href='eksamen1.sh?logout=true&username=$username'>No, Logout</a></p>"
   echo "</center>"
   echo "</body></html>"
@@ -152,7 +156,7 @@ if [[ -n "$user_guess" && -n "$city_name" && -n "$latitude" && -n "$longitude" &
 fi
 
 # Display the login/signup form if no action is taken
-echo ""
+echo ""  # Blank line for HTTP header
 echo "<html>"
 echo "<body style='background-color: lightblue; margin-top: 150px;'>"
 echo "<center>"
