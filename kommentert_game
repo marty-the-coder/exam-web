@@ -1,0 +1,139 @@
+echo "Content-type: text/html"
+echo ""  # Blank line required between headers and body
+echo "<html><body>"
+echo "<h1>Guess the Temperature Game</h1>"
+
+# Making a function that gets the cities from the cities.txt file that we have made
+fetch_random_city() { 
+  # Getting teh random city from the list, using "shuf" to shuffle the citites so
+  # that we get a random city at the top, and then we used "-n 1" to obly select 
+  # one line from the file that has been randomized (the city that will be guessed)
+  RANDOM_CITY_INFO=$(shuf -n 1 /var/www/html/cities.txt)
+  # printing out the random city that was chosen
+  echo "$RANDOM_CITY_INFO"
+}
+
+# Function to get temperature from Open-Meteo API
+get_temperature_by_coords() {
+  # using local so that the variables are only used withing this function, so that
+  # they don't intervene with variables used later in the code. We set latitude and
+  # longitude to $1 and $2 to get the first and second argument from the list of cities
+  local lat="$1"
+  local lon="$2"
+  # We used the weather api to get the information from the latitude and longitude values
+  # from the random city chosen in the "fetch_random_city"
+  # We used curl to get information from the weather api and used "-s" to make the output
+  # silent so that it doesn't show error messages or progress. We then used "--max-time 5" to
+  # stop the request if it takes more than 5 seconds
+  local response=$(curl -s --max-time 5 "https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true")
+  # getting the response from the weather api and and parcing the data into only the temperature
+  # using the "jq" command. We used "-r" to make the output raw data (no quotes around the result)
+  # We used the //"null" in case the API doesn't have the temperature available
+  local temp=$(echo "$response" | jq -r '.current_weather.temperature // "null"')
+  # Checking if the temperature information cannot be retrieved, if it is then we
+  # made the code indicate that there was en error 
+  [[ "$temp" == "null" ]] && return 1
+  # If the code successfully gets the temperature from the weather api, then it 
+  # will echo the temperature that will be guessed 
+  echo "$temp"
+}
+
+# Handle form submission (checking if user made a guess)
+# The QUERY_STRING contains data in the form of key=value pairs.
+#It’s used to send data from the client (user's browser) to the server (the script) in a URL when a form is submitted via the GET method.
+#In your script, QUERY_STRING helps to extract and use data (such as the user's guess and city details) to process the temperature comparison.
+# example: user_guess=25&city_name=New%20York&latitude=40.7128&longitude=-74.0060
+if [ "$QUERY_STRING" ]; then
+  # Extract user guess from form submission
+  guess=$(echo $QUERY_STRING | sed -n 's/.*user_guess=\([^&]*\).*/\1/p')
+  
+  # Get city info (saved from last request or picked randomly)
+#user_guess=25&city_name=New%20York&latitude=40.7128&longitude=-74.0060
+#The expression 's/.*city_name=\([^&]*\).*/\1/p' works as follows:
+#It looks for city_name= in the string.
+#It captures everything after city_name= until it encounters an & (or the end of the string), which is New%20York (the city name).
+#The \1 refers to this captured part, so the result will be New%20York.
+#The p flag tells sed to print New%20York.
+  CITY_NAME=$(echo $QUERY_STRING | sed -n 's/.*city_name=\([^&]*\).*/\1/p')
+  LATITUDE=$(echo $QUERY_STRING | sed -n 's/.*latitude=\([^&]*\).*/\1/p')
+  LONGITUDE=$(echo $QUERY_STRING | sed -n 's/.*longitude=\([^&]*\).*/\1/p')
+
+  # Making a function that gets the temperature from the latitude and longitude given in
+  # the .txt file for every city 
+  ACTUAL_TEMP=$(get_temperature_by_coords "$LATITUDE" "$LONGITUDE")
+  # making a condtion that checks if "$?" is NOT equal to (-ne) 0, so a condition that 
+  # checks if we were able to get the temperature for the given city
+  if [[ $? -ne 0 ]]; then
+    # if not, then we print out this message
+    echo "<p>Failed to fetch the temperature for ${CITY_NAME}. Please try again.</p>"
+    # exit the script with error status 1 (something went wrong)
+    exit 1
+  fi
+
+  # Calculate the absolute difference between the guess and the actual temperature
+  # Making a function for the difference between the actual temperature in the random
+  # city and the temperature guessed by the user. We used "bc" (basic calculator) to 
+  # do the simple math and "tr" to delete characters and "-d -" to remove all minuses
+  # from the output so that the difference is always positive
+  DIFF=$(echo "$ACTUAL_TEMP - $guess" | bc | tr -d -)
+
+  # Display the random city, the guessed temperature and the actual temperature to the user
+  echo "<h2>City: ${CITY_NAME}</h2>"
+  echo "<p>Your guess: ${guess}&deg;C</p>"
+  echo "<p>Actual temperature: ${ACTUAL_TEMP}&deg;C</p>"
+
+  # Making a function that checks whether the difference between the guess and the actual
+  # temperature is less than 5 degrees. We used "bc -l" to use basic calculator with 
+  # non-integer numbers (numbers with decimal points
+  if (( $(echo "$DIFF < 5" | bc -l) )); then
+    # if the difference is less than 5 degrees, we print out this message
+    echo "<p>Congratulations! You were close!</p>"
+  else
+    #if the difference is bigger that 5, print out this message
+    echo "<p>Better luck next time!</p>"
+  fi
+
+  # Asking the player if they want to play again. If they press "yes", we send them 
+  # back to the start page with the game, if not we make them quit the game
+  echo "<p>Play again? <a href='eksamen1.sh'>Yes</a> | <a href='?quit=true'>No</a></p>"
+
+  # Making an if statement that checks if the user pressed "No"
+  if [[ "$QUERY_STRING" == *"quit=true"* ]]; then
+    # If the user cliced no, we print out this message 
+    echo "<p>Goodbye! Thanks for playing.</p>"
+    # then we exited the script with a success status (the script completed without errors)
+    exit 0
+  fi
+
+else
+  # Display the guess input form with a new random city if the page is being loaded for the first time
+  # Getting the city with the information from the function at the top
+  RANDOM_CITY_INFO=$(fetch_random_city)
+  # Naming the variable that contains the city name. We used "cut -d',' -f1" to split the 
+  # string between the commas to separate the city name from the latitude and longitude value
+  # and extracting only the first value before the first comma using "cut -d'.' -f1"
+  CITY_NAME=$(echo "$RANDOM_CITY_INFO" | cut -d',' -f1)
+  # extracting the second part of the line  (the latitude value), and storing the value inside
+  # the "LATITUDE" variable
+  LATITUDE=$(echo "$RANDOM_CITY_INFO" | cut -d',' -f2)
+  # same as the last line, but extracting the third value instead (the longitude value)
+  LONGITUDE=$(echo "$RANDOM_CITY_INFO" | cut -d',' -f3)
+
+  # making the html code that will be shown to the user on the webpage
+  # using the "$city_name" to get the random city generated earlier
+  echo "<h2>Guess the current temperature in ${CITY_NAME}:</h2>"
+  echo "<p>Type your guess in Celsius and submit.</p>"
+  # Using the for method='get' so the data will be appended to the URL
+  echo "<form method='get' action='eksamen1.sh'>"
+  echo "<input type='text' name='user_guess' placeholder='Enter your guess' />"
+  # Storing the "city_name" value when the form is submitted (the user does not see this value)
+  echo "<input type='hidden' name='city_name' value='${CITY_NAME}' />"
+  # Same as with last line, but with latitude value instead of city name 
+  echo "<input type='hidden' name='latitude' value='${LATITUDE}' />"
+  # Same as last line, but with longitude value
+  echo "<input type='hidden' name='longitude' value='${LONGITUDE}' />"
+  echo "<input type='submit' value='Submit' />"
+  echo "</form>"
+fi
+
+echo "</body></html>"
