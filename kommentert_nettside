@@ -46,8 +46,12 @@ validate_user() {
 urldecode() {
   # making a variable that is set to the first value of the string
   local encoded="$1"
-  # 
-  printf '%b' "${encoded//%/\\x}"
+  # the first half (printf '%b') tells the script how to format and print the given "$encoded". 
+# the "printf" part is what tells it that it should be formattet and the "%b" format tells printf to interpret 
+#backslash escapes in the string
+  printf '%b' "${encoded//%/\\x}" #the second half of this ("${encoded//%/\\x}") tells it to replace all 
+#"%" with "/x" so it can be read as a backslash code (ASCII)
+#for eksample "%21" will be "/x21" and when interpretet it will be "!"
 }
 
 # Making a variable to parse the query string (extracting and decoding query parameters and turning them
